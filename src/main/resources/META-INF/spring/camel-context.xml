@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configures the Camel Context -->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camel="http://camel.apache.org/schema/spring"
+	xmlns:cxf="http://camel.apache.org/schema/cxf" xmlns:jaxrs="http://cxf.apache.org/jaxrs"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:sws="http://www.springframework.org/schema/web-services"
+	xmlns:util="http://www.springframework.org/schema/util" xmlns:osgi="http://www.springframework.org/schema/osgi"
+	xsi:schemaLocation="
+    http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd
+    http://cxf.apache.org/jaxrs http://cxf.apache.org/schemas/jaxrs.xsd
+    http://camel.apache.org/schema/osgi http://camel.apache.org/schema/osgi/camel-osgi.xsd
+    http://www.springframework.org/schema/util  http://www.springframework.org/schema/util/spring-util.xsd
+    http://www.springframework.org/schema/osgi http://www.springframework.org/schema/osgi/spring-osgi.xsd">
+
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer"
+		id="propertyConfigurer">
+		<property name="properties" ref="service-properties" />
+	</bean>
+
+	<util:properties id="service-properties">
+		<prop key="publicAddress">jkdlrn</prop>
+	</util:properties>
+
+	<bean id="jaxbProvider" class="org.apache.cxf.jaxrs.provider.JAXBElementProvider">
+		<property name="marshallAsJaxbElement" value="true" />
+	</bean>
+
+	<bean id="jasonProvider" class="org.apache.cxf.jaxrs.provider.JSONProvider">
+		<property name="marshallAsJaxbElement" value="true" />
+	</bean>
+	
+	<bean id="lmrDispatcher" class="org.jkd.camel.example.lmr.MemberRegistrationDispatcher" />
+	
+	<bean id="orgAUVProcessor" class="org.jkd.camel.example.lmr.orga.OrganizationAUserVerificationProcessor" />
+	
+	<bean id="orgBUVProcessor" class="org.jkd.camel.example.lmr.orgb.OrganizationBUserVerificationProcessor" />
+	
+	<bean id="registrationService" class="org.jkd.camel.example.lmr.MemberRegistrationService" />
+	
+	<bean id="responseTransformer" class="org.jkd.camel.example.lmr.ResponseTransformer" />
+	
+	<jaxrs:server id="lmrServer" address="http://localhost:8080/jkdlrn">
+		<jaxrs:providers>
+			<ref bean="jasonProvider"/>
+			<ref bean="jaxbProvider"/>
+		</jaxrs:providers>
+		<jaxrs:serviceBeans>
+			<ref bean="lmrDispatcher"/>
+		</jaxrs:serviceBeans>
+	</jaxrs:server>
+
+	<camel:camelContext xmlns="http://camel.apache.org/schema/spring">
+		<camel:propertyPlaceholder id="properties" location="ref:service-properties"/>
+		<camel:route>
+			<camel:from uri="cxfrs://bean://lmrServer" />
+			<camel:choice>
+				<camel:when>
+					<camel:simple>${body[0].organization} == 'orga'</camel:simple>
+					<camel:to uri="bean:orgAUVProcessor" />
+				</camel:when>
+				<camel:otherwise>
+					<camel:to uri="bean:orgBUVProcessor" />
+				</camel:otherwise>
+			</camel:choice>
+			<camel:to uri="bean:registrationService" />
+			<camel:to uri="bean:responseTransformer" />
+		</camel:route>
+	</camel:camelContext>
+
+</beans>
